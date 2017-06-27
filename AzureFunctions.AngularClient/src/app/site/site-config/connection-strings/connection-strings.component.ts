@@ -5,11 +5,17 @@ import { Subject } from 'rxjs/Subject';
 import { Subscription as RxSubscription } from 'rxjs/Subscription';
 import { TranslateService } from '@ngx-translate/core';
 
+
+import { ConnectionStrings, ConnectionStringType } from './../../../shared/models/arm/connection-strings';
+
+
+
+
+
 import { AiService } from './../../../shared/services/ai.service';
 import { PortalResources } from './../../../shared/models/portal-resources';
 import { EnumEx } from './../../../shared/Utilities/enumEx';
 import { DropDownElement } from './../../../shared/models/drop-down-element';
-import { ConnectionStrings, ConnectionStringType } from './../../../shared/models/arm/connection-strings';
 import { BusyStateComponent } from './../../../busy-state/busy-state.component';
 import { TabsComponent } from './../../../tabs/tabs.component';
 import { CustomFormGroup, CustomFormControl } from './../../../controls/click-to-edit/click-to-edit.component';
@@ -19,27 +25,33 @@ import { CacheService } from './../../../shared/services/cache.service';
 import { UniqueValidator } from 'app/shared/validators/uniqueValidator';
 import { RequiredValidator } from 'app/shared/validators/requiredValidator';
 
-
 @Component({
   selector: 'connection-strings',
   templateUrl: './connection-strings.component.html',
   styleUrls: ['./connection-strings.component.scss']
 })
 export class ConnectionStringsComponent implements OnInit, OnChanges {
-  public connectionStringTypes: DropDownElement<ConnectionStringType>[];
   public Resources = PortalResources;
   public groupArray: FormArray;
 
   public resourceIdStream: Subject<string>;
   private _resourceIdSubscription: RxSubscription;
 
-  private _connectionStringsArm: ArmObj<ConnectionStrings>;
   private _busyState: BusyStateComponent;
   private _busyStateSubscription: RxSubscription;
   private _busyStateKey: string;
 
   private _requiredValidator: RequiredValidator;
   private _uniqueCsValidator: UniqueValidator;
+
+  private _connectionStringsArm: ArmObj<ConnectionStrings>;
+  public connectionStringTypes: DropDownElement<ConnectionStringType>[];
+
+
+
+
+
+
 
 constructor(
     private _cacheService: CacheService,
@@ -52,13 +64,16 @@ constructor(
       this._busyStateSubscription = this._busyState.clear.subscribe(event => this._busyStateKey = undefined);
 
       this.resourceIdStream = new Subject<string>();
-
       this._resourceIdSubscription = this.resourceIdStream
       .distinctUntilChanged()
       .switchMap(() => {
         this.setScopedBusyState();
         // Not bothering to check RBAC since this component will only be used in Standalone mode
         return this._cacheService.postArm(`${this.resourceId}/config/connectionstrings/list`, true);
+
+
+
+
       })
       .do(null, error => {
         this._aiService.trackEvent("/errors/connection-strings", error);
@@ -68,6 +83,8 @@ constructor(
       .subscribe(r => {
         this.clearScopedBusyState();
         this._connectionStringsArm = r.json();
+
+
         this._setupForm(this._connectionStringsArm);
       });
   }
