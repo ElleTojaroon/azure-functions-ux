@@ -41,6 +41,7 @@ export class SiteConfigComponent implements OnInit {
       .switchMap(viewInfo => {
         this.resourceId = viewInfo.resourceId;
         this.mainForm = this._fb.group({});
+        (<any>this.mainForm).timeStamp = new Date(); //for debugging
         return Observable.of(viewInfo);
         // Not bothering to check RBAC since this component will only be used in Standalone mode
       })
@@ -73,10 +74,12 @@ export class SiteConfigComponent implements OnInit {
     .subscribe(r => {
       this._busyState.clearBusyState();
       this.mainForm = this._fb.group({});
+      (<any>this.mainForm).timeStamp = new Date(); //for debugging
     });
   }
 
   discard(){
     this.mainForm = this._fb.group({});
+    (<any>this.mainForm).timeStamp = new Date(); //for debugging
   }
 }
