@@ -41,6 +41,8 @@ export class ConnectionStringsComponent implements OnInit, OnChanges {
   private _busyStateSubscription: RxSubscription;
   private _busyStateKey: string;
 
+  private _saveError: string;
+
   private _requiredValidator: RequiredValidator;
   private _uniqueCsValidator: UniqueValidator;
 
@@ -67,6 +69,7 @@ constructor(
       this._resourceIdSubscription = this.resourceIdStream
       .distinctUntilChanged()
       .switchMap(() => {
+        this._saveError = null;
         this.setScopedBusyState();
         // Not bothering to check RBAC since this component will only be used in Standalone mode
         return this._cacheService.postArm(`${this.resourceId}/config/connectionstrings/list`, true);
@@ -77,15 +80,17 @@ constructor(
       })
       .do(null, error => {
         this._aiService.trackEvent("/errors/connection-strings", error);
+        this._connectionStringsArm = null;
+        this._setupForm(this._connectionStringsArm);
         this.clearScopedBusyState();
       })
       .retry()
       .subscribe(r => {
-        this.clearScopedBusyState();
         this._connectionStringsArm = r.json();
 
 
         this._setupForm(this._connectionStringsArm);
+        this.clearScopedBusyState();
       });
   }
 
@@ -144,46 +149,59 @@ constructor(
 */
 
   private _setupForm(connectionStringsArm: ArmObj<ConnectionStrings>){
-    if(!connectionStringsArm){
-        return;
+    
+    if(!!connectionStringsArm){
+      if(!this._saveError || !this.groupArray){
+        this.groupArray = this._fb.array([]);
+
+        this._requiredValidator = new RequiredValidator(this._translateService);
+    
+        this._uniqueCsValidator = new UniqueValidator(
+          "name",
+          this.groupArray,
+          this._translateService.instant(PortalResources.validation_duplicateError));
+
+        for(let name in connectionStringsArm.properties){
+          if(connectionStringsArm.properties.hasOwnProperty(name)){
+
+            let connectionString = connectionStringsArm.properties[name];
+            let connectionStringDropDownTypes = this._getConnectionStringTypes(connectionString.type);
+
+            let group = this._fb.group({
+              name: [
+                name,
+                Validators.compose([
+                  this._requiredValidator.validate.bind(this._requiredValidator),
+                  this._uniqueCsValidator.validate.bind(this._uniqueCsValidator)])],
+              value: [connectionString.value],
+              type: [connectionStringDropDownTypes.find(t => t.default).value]
+            });
+
+            (<any>group).csTypes = connectionStringDropDownTypes;
+            this.groupArray.push(group);
+          }
+        }
+      }
+      // else{
+      //   setTimeout(this.mainForm.markAsDirty(), 0);
+      // }
+
+      if(this.mainForm.contains("connectionStrings")){
+        this.mainForm.setControl("connectionStrings", this.groupArray);
+      }
+      else{
+        this.mainForm.addControl("connectionStrings", this.groupArray);
+      }
     }
-
-    this.groupArray = this._fb.array([]);
-
-    this._requiredValidator = new RequiredValidator(this._translateService);
- 
-    this._uniqueCsValidator = new UniqueValidator(
-      "name",
-      this.groupArray,
-      this._translateService.instant(PortalResources.validation_duplicateError));
-
-    for(let name in connectionStringsArm.properties){
-      if(connectionStringsArm.properties.hasOwnProperty(name)){
-
-        let connectionString = connectionStringsArm.properties[name];
-        let connectionStringDropDownTypes = this._getConnectionStringTypes(connectionString.type);
-
-        let group = this._fb.group({
-          name: [
-            name,
-            Validators.compose([
-              this._requiredValidator.validate.bind(this._requiredValidator),
-              this._uniqueCsValidator.validate.bind(this._uniqueCsValidator)])],
-          value: [connectionString.value],
-          type: [connectionStringDropDownTypes.find(t => t.default).value]
-        });
-
-        (<any>group).csTypes = connectionStringDropDownTypes;
-        this.groupArray.push(group);
+    else
+    {
+      this.groupArray = null;
+      if(this.mainForm.contains("connectionStrings")){
+        this.mainForm.removeControl("connectionStrings");
       }
     }
 
-    if(this.mainForm.contains("connectionStrings")){
-      this.mainForm.setControl("connectionStrings", this.groupArray);
-    }
-    else{
-      this.mainForm.addControl("connectionStrings", this.groupArray);
-    }
+    this._saveError = null;
 
   }
 
@@ -223,6 +241,8 @@ constructor(
         return Observable.of(true);
       })
       .catch(error => {
+        this._connectionStringsArm = null;
+        //this._saveError = "Error";
         return Observable.of(false);
       });
     }

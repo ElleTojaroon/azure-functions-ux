@@ -43,6 +43,8 @@ export class GeneralSettingsComponent implements OnInit, OnChanges {
   private _busyStateSubscription: RxSubscription;
   private _busyStateKey: string;
 
+  private _saveError: string;
+
   //private _requiredValidator: RequiredValidator;
   //private _uniqueAppSettingValidator: UniqueValidator;
 
@@ -75,6 +77,7 @@ export class GeneralSettingsComponent implements OnInit, OnChanges {
       this._resourceIdSubscription = this.resourceIdStream
       .distinctUntilChanged()
       .switchMap(() => {
+        this._saveError = null;
         this.setScopedBusyState();
         // Not bothering to check RBAC since this component will only be used in Standalone mode
          return Observable.zip(
@@ -85,14 +88,16 @@ export class GeneralSettingsComponent implements OnInit, OnChanges {
       })
       .do(null, error => {
         this._aiService.trackEvent("/errors/general-settings", error);
+        this._webConfigArm = null;
+        this._setupForm(this._webConfigArm, this._availableStacksArm);
         this.clearScopedBusyState();
       })
       .retry()
       .subscribe(r => {
-        this.clearScopedBusyState();
         this._webConfigArm = r.webConfigResponse.json();
         this._availableStacksArm = this._availableStacksArm || r.availableStacksResponse.json();
         this._setupForm(this._webConfigArm, this._availableStacksArm);
+        this.clearScopedBusyState();
       });
   }
 
@@ -151,35 +156,46 @@ export class GeneralSettingsComponent implements OnInit, OnChanges {
 */
 
   private _setupForm(webConfigArm: ArmObj<SiteConfig>, availableStacksArm: ArmArrayResult<AvailableStack>){
-    if(!webConfigArm || !availableStacksArm){
-        return;
-    }
 
-    //this._generateStacksOptions(availableStacksArm, webConfigArm);
-
-    let netFrameWorkVersion = this._createWebConfigSettingGroup("netFrameworkVersion");
-    (<any>netFrameWorkVersion).creationTime = new Date();
-    let phpVersion = this._createWebConfigSettingGroup("phpVersion");
-    (<any>phpVersion).creationTime = new Date();
-    let javaVersion = this._createWebConfigSettingGroup("javaVersion");
-    (<any>javaVersion).creationTime = new Date();
-    let pythonVersion = this._createWebConfigSettingGroup("pythonVersion");
-    (<any>pythonVersion).creationTime = new Date();
+    if(!!webConfigArm && !!availableStacksArm){
+      if(!this._saveError || !this.group){
+        //this._generateStacksOptions(availableStacksArm, webConfigArm);
+        let netFrameWorkVersion = this._createWebConfigSettingGroup("netFrameworkVersion");
+        (<any>netFrameWorkVersion).creationTime = new Date();
+        let phpVersion = this._createWebConfigSettingGroup("phpVersion");
+        (<any>phpVersion).creationTime = new Date();
+        let javaVersion = this._createWebConfigSettingGroup("javaVersion");
+        (<any>javaVersion).creationTime = new Date();
+        let pythonVersion = this._createWebConfigSettingGroup("pythonVersion");
+        (<any>pythonVersion).creationTime = new Date();
 
 
-    this.group = this._fb.group({
-      netFrameWorkVersion: netFrameWorkVersion,
-      phpVersion: phpVersion,
-      javaVersion: javaVersion,
-      pythonVersion: pythonVersion
-    });
+        this.group = this._fb.group({
+          netFrameWorkVersion: netFrameWorkVersion,
+          phpVersion: phpVersion,
+          javaVersion: javaVersion,
+          pythonVersion: pythonVersion
+        });
+      }
+      // else{
+      //   setTimeout(this.mainForm.markAsDirty(), 0);
+      // }
 
-    if(this.mainForm.contains("generalSettings")){
-      this.mainForm.setControl("generalSettings", this.group);
+      if(this.mainForm.contains("generalSettings")){
+        this.mainForm.setControl("generalSettings", this.group);
+      }
+      else{
+        this.mainForm.addControl("generalSettings", this.group);
+      }
     }
     else{
-      this.mainForm.addControl("generalSettings", this.group);
+      this.group = null;
+      if(this.mainForm.contains("generalSettings")){
+        this.mainForm.removeControl("generalSettings");
+      }
     }
+
+    this._saveError = null;
 
   }
 
@@ -429,6 +445,8 @@ export class GeneralSettingsComponent implements OnInit, OnChanges {
         return Observable.of(true);
       })
       .catch(error => {
+        //this._webConfigArm = null;
+        this._saveError = "Error";
         return Observable.of(false);
       });
     }

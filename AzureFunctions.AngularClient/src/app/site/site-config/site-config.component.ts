@@ -74,6 +74,9 @@ export class SiteConfigComponent implements OnInit {
     .subscribe(r => {
       this._busyState.clearBusyState();
       this.mainForm = this._fb.group({});
+      if(!r.generalSettingsSaved || !r.appSettingsSaved || !r.connectionStringsSaved){
+        this.mainForm.markAsDirty();
+      }
       (<any>this.mainForm).timeStamp = new Date(); //for debugging
     });
   }

@@ -40,6 +40,8 @@ export class AppSettingsComponent implements OnInit, OnChanges {
   private _busyStateSubscription: RxSubscription;
   private _busyStateKey: string;
 
+  private _saveError: string;
+
   private _requiredValidator: RequiredValidator;
   private _uniqueAppSettingValidator: UniqueValidator;
 
@@ -66,6 +68,7 @@ export class AppSettingsComponent implements OnInit, OnChanges {
       this._resourceIdSubscription = this.resourceIdStream
       .distinctUntilChanged()
       .switchMap(() => {
+        this._saveError = null;
         this.setScopedBusyState();
         // Not bothering to check RBAC since this component will only be used in Standalone mode
         return this._cacheService.postArm(`${this.resourceId}/config/appSettings/list`, true);
@@ -76,15 +79,17 @@ export class AppSettingsComponent implements OnInit, OnChanges {
       })
       .do(null, error => {
         this._aiService.trackEvent("/errors/app-settings", error);
+        this._appSettingsArm = null;
+        this._setupForm(this._appSettingsArm);
         this.clearScopedBusyState();
       })
       .retry()
       .subscribe(r => {
-        this.clearScopedBusyState();
         this._appSettingsArm = r.json();
 
 
         this._setupForm(this._appSettingsArm);
+        this.clearScopedBusyState();
       });
   }
 
@@ -143,39 +148,51 @@ export class AppSettingsComponent implements OnInit, OnChanges {
 */
 
   private _setupForm(appSettingsArm: ArmObj<any>){
-    if(!appSettingsArm){
-        return;
+    
+    if(!!appSettingsArm){
+      if(!this._saveError || !this.groupArray){
+        this.groupArray = this._fb.array([]);
+
+        this._requiredValidator = new RequiredValidator(this._translateService);
+        this._uniqueAppSettingValidator = new UniqueValidator(
+          "name",
+          this.groupArray,
+          this._translateService.instant(PortalResources.validation_duplicateError));
+
+        for(let name in appSettingsArm.properties){
+          if(appSettingsArm.properties.hasOwnProperty(name)){
+
+            this.groupArray.push(this._fb.group({
+              name: [
+                name,
+                Validators.compose([
+                  this._requiredValidator.validate.bind(this._requiredValidator),
+                  this._uniqueAppSettingValidator.validate.bind(this._uniqueAppSettingValidator)])],
+                value: [appSettingsArm.properties[name]]
+            }));
+          }
+        }
+      }
+      // else{
+      //   setTimeout(this.mainForm.markAsDirty(), 0);
+      // }
+
+      if(this.mainForm.contains("appSettings")){
+        this.mainForm.setControl("appSettings", this.groupArray);
+      }
+      else{
+        this.mainForm.addControl("appSettings", this.groupArray);
+      }
     }
-
-    this.groupArray = this._fb.array([]);
-
-    this._requiredValidator = new RequiredValidator(this._translateService);
-    this._uniqueAppSettingValidator = new UniqueValidator(
-      "name",
-      this.groupArray,
-      this._translateService.instant(PortalResources.validation_duplicateError));
-
-    for(let name in appSettingsArm.properties){
-      if(appSettingsArm.properties.hasOwnProperty(name)){
-
-        this.groupArray.push(this._fb.group({
-          name: [
-            name,
-            Validators.compose([
-              this._requiredValidator.validate.bind(this._requiredValidator),
-              this._uniqueAppSettingValidator.validate.bind(this._uniqueAppSettingValidator)])],
-            value: [appSettingsArm.properties[name]]
-        }));
-
+    else
+    {
+      this.groupArray = null;
+      if(this.mainForm.contains("appSettings")){
+        this.mainForm.removeControl("appSettings");
       }
     }
 
-    if(this.mainForm.contains("appSettings")){
-      this.mainForm.setControl("appSettings", this.groupArray);
-    }
-    else{
-      this.mainForm.addControl("appSettings", this.groupArray);
-    }
+    this._saveError = null;
 
   }
 
@@ -209,6 +226,8 @@ export class AppSettingsComponent implements OnInit, OnChanges {
         return Observable.of(true);
       })
       .catch(error => {
+        this._appSettingsArm = null;
+        //this._saveError = "Error";
         return Observable.of(false);
       });
     }

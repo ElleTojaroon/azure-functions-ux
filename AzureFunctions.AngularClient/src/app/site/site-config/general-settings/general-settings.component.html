@@ -1,3 +1,7 @@
+<div *ngIf="!group" class="settings-group-wrapper">
+  <h3 class="text-level2-heading first-config-heading">{{ 'feature_generalSettingsName' | translate }}</h3>
+  <p>Error Loading Settings</p>
+</div>
 <div *ngIf="!!group" class="settings-group-wrapper">
   <h3 class="text-level2-heading first-config-heading">{{ 'feature_generalSettingsName' | translate }}</h3>
   <div class="setting-wrapper">
