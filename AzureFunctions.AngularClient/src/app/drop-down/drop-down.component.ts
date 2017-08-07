@@ -1,4 +1,4 @@
-import { Subject } from 'rxjs/Subject';
+﻿import { Subject } from 'rxjs/Subject';
 import { FormGroup, FormControl } from '@angular/forms';
 import { Component, OnInit, EventEmitter, ViewChild, Input, Output } from '@angular/core';
 import {DropDownElement} from '../shared/models/drop-down-element';
@@ -78,6 +78,7 @@ export class DropDownComponent<T> implements OnInit {
     }
 
     onSelect(id: string) {
+         
         var element = this._options.find(e => e.id.toString() === id);
         this.selectedElement = element;
         this.value.emit(element.value);
